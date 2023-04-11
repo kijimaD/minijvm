@@ -1,0 +1,9 @@
+version: '3.6'
+services:
+  java:
+    build: .
+    ports:
+      - 8020:8080
+    tty: true
+    volumes:
+      - .:/work
