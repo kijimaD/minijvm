@@ -49,6 +49,17 @@ type Data1 struct {
 	ConstantPoolCount uint16
 }
 
+type Data2 struct {
+	AccessFlags     uint16
+	ThisClass       uint16
+	SuperClass      uint16
+	InterfacesCount uint16
+	// Interfaces      uint16 // skip
+	FieldsCount uint16
+	// Fields      FieldInfo // skip
+	MethodsCount uint16
+}
+
 func (cl *ClassFile) Run() {
 	f, err := os.Open("../Main.class")
 	if err != nil {
@@ -129,4 +140,15 @@ func (cl *ClassFile) Run() {
 			panic(fmt.Sprintf("%d is not support!", tag))
 		}
 	}
+
+	data2 := Data2{}
+	errb = binary.Read(f, binary.BigEndian, &data2)
+	if errb != nil {
+		panic(errb)
+	}
+	// check
+	// tc, _ := constPoolItems[data2.ThisClass-1].(ConstClass)
+	// sc, _ := constPoolItems[data2.SuperClass-1].(ConstClass)
+	// fmt.Printf("%s\n", constPoolItems[tc.NameIdx])
+	// fmt.Printf("%s\n", constPoolItems[sc.NameIdx])
 }
