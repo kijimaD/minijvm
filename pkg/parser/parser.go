@@ -61,28 +61,23 @@ func (cl *ClassFile) Run() {
 		panic(errb)
 	}
 
-	// cpinfoの0番目はないらしい
-	var skip uint8
-	errb = binary.Read(f, binary.BigEndian, &skip)
-
 	var constPoolItems []interface{}
 
-	for i := 0; i < int(data1.ConstantPoolCount); i++ {
+	for i := 0; i < int(data1.ConstantPoolCount-1); i++ {
 		var tag uint8
 		errb = binary.Read(f, binary.BigEndian, &tag)
 		if errb != nil {
 			panic(errb)
 		}
-		fmt.Printf("%#v\n", tag)
 		switch tag {
 		case 1:
-			var length uint8
+			var length uint16
 			errb = binary.Read(f, binary.BigEndian, &length)
 			if errb != nil {
 				panic(errb)
 			}
 			var bs []uint8
-			for j := 0; j < int(length); i++ {
+			for j := 0; j < int(length); j++ {
 				var b uint8
 				errb = binary.Read(f, binary.BigEndian, &b)
 				if errb != nil {
@@ -102,8 +97,36 @@ func (cl *ClassFile) Run() {
 				panic(errb)
 			}
 			constPoolItems = append(constPoolItems, constClass)
+		case 8:
+			constString := ConstString{}
+			errb = binary.Read(f, binary.BigEndian, &constString)
+			if errb != nil {
+				panic(errb)
+			}
+			constPoolItems = append(constPoolItems, constString)
+		case 9:
+			fieldRef := FieldRef{}
+			errb = binary.Read(f, binary.BigEndian, &fieldRef)
+			if errb != nil {
+				panic(errb)
+			}
+			constPoolItems = append(constPoolItems, fieldRef)
+		case 10:
+			methodRef := MethodRef{}
+			errb = binary.Read(f, binary.BigEndian, &methodRef)
+			if errb != nil {
+				panic(errb)
+			}
+			constPoolItems = append(constPoolItems, methodRef)
+		case 12:
+			nameandtype := NameAndType{}
+			errb = binary.Read(f, binary.BigEndian, &nameandtype)
+			if errb != nil {
+				panic(errb)
+			}
+			constPoolItems = append(constPoolItems, nameandtype)
+		default:
+			panic(fmt.Sprintf("%d is not support!", tag))
 		}
 	}
-
-	fmt.Printf("%#v\n", constPoolItems)
 }
