@@ -1,8 +1,8 @@
 package parser
 
 type ConstUtf8 struct {
-	length uint16
-	bytes  []uint8
+	Length uint16
+	Bytes  []uint8
 }
 
 type ConstClass struct {

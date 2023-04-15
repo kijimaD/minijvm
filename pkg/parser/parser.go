@@ -29,47 +29,11 @@ type ClassFile struct {
 	// Attributes         AttributeInfo // その他の付加情報
 }
 
-type FieldInfo struct {
-	Dummy uint
-}
-
-type MethodInfo struct {
-	Dummy uint
-}
-
-type AttributeInfo struct {
-	Dummy uint
-}
-
-type CpInfo struct {
-	Tag  uint8
-	Info []uint
-}
-
 type Data1 struct {
 	Magic             uint32
 	MinorVersion      uint16
 	MajorVersion      uint16
 	ConstantPoolCount uint16
-}
-
-type Data2 struct {
-	AccessFlags     uint16
-	ThisClass       uint16
-	SuperClass      uint16
-	InterfacesCount uint16
-	// Interfaces      uint16 // skip
-	FieldsCount uint16
-	// Fields      FieldInfo // skip
-	MethodsCount uint16
-}
-
-// MethodInfo
-type Data3 struct {
-	AccessFlags     uint16
-	NameIndex       uint16
-	DescriptorIndex uint16
-	AttributesCount uint16
 }
 
 func (cl *ClassFile) Run() {
@@ -109,8 +73,8 @@ func (cl *ClassFile) Run() {
 				bs = append(bs, b)
 			}
 			utf8 := ConstUtf8{
-				length: length,
-				bytes:  bs,
+				Length: length,
+				Bytes:  bs,
 			}
 			constPoolItems = append(constPoolItems, utf8)
 		case 7:
@@ -153,12 +117,6 @@ func (cl *ClassFile) Run() {
 		}
 	}
 
-	// data2 := Data2{}
-	// errb = binary.Read(f, binary.BigEndian, &data2)
-	// if errb != nil {
-	// 	panic(errb)
-	// }
-
 	// check
 	// tc, _ := constPoolItems[data2.ThisClass-1].(ConstClass)
 	// sc, _ := constPoolItems[data2.SuperClass-1].(ConstClass)
@@ -181,14 +139,15 @@ func ReadMethod(f *os.File, cpe []interface{}) {
 	if errb != nil {
 		panic(errb)
 	}
-	// attributes
-	for i := 0; i < int(methods_count); i++ {
-		var method Method
-		errb := binary.Read(f, binary.BigEndian, &method)
-		if errb != nil {
-			panic(errb)
-		}
 
+	var method Method
+	errb = binary.Read(f, binary.BigEndian, &method)
+	if errb != nil {
+		panic(errb)
+	}
+
+	// attributes
+	for i := 0; i < int(method.AttributesCount); i++ {
 		for j := 0; j < int(method.AttributesCount-1); j++ {
 			ReadAttr(f, cpe)
 		}
@@ -212,7 +171,7 @@ func ReadAttr(f *os.File, cpe []interface{}) {
 	attridx_utf8, ok := attridx.(ConstUtf8)
 
 	if ok {
-		switch fmt.Sprintf("%s", attridx_utf8.bytes) {
+		switch fmt.Sprintf("%s", attridx_utf8.Bytes) {
 		case "Code":
 			ReadCodeAttr(f, cpe, attributeLen)
 		case "LineNumberTable":
@@ -220,7 +179,7 @@ func ReadAttr(f *os.File, cpe []interface{}) {
 		case "SourceFile":
 			fmt.Println("sourcefile")
 		default:
-			panic(fmt.Sprintf("%s is not implemented", attridx_utf8.bytes))
+			panic(fmt.Sprintf("%s is not implemented", attridx_utf8.Bytes))
 		}
 	}
 }
@@ -243,10 +202,6 @@ func ReadCodeAttr(f *os.File, cpe []interface{}, attrLen uint32) {
 	if errb != nil {
 		panic(errb)
 	}
-	fmt.Printf("%o\n", codeLen)
-
-	// codeLenが大きな数値になる。それでバイナリサイズを超える
-	// len と countが違う
 
 	var code []uint8
 	for i := 0; i < int(codeLen); i++ {
