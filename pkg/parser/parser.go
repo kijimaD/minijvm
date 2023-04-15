@@ -153,11 +153,11 @@ func (cl *ClassFile) Run() {
 		}
 	}
 
-	data2 := Data2{}
-	errb = binary.Read(f, binary.BigEndian, &data2)
-	if errb != nil {
-		panic(errb)
-	}
+	// data2 := Data2{}
+	// errb = binary.Read(f, binary.BigEndian, &data2)
+	// if errb != nil {
+	// 	panic(errb)
+	// }
 
 	// check
 	// tc, _ := constPoolItems[data2.ThisClass-1].(ConstClass)
@@ -165,95 +165,116 @@ func (cl *ClassFile) Run() {
 	// fmt.Printf("%s\n", constPoolItems[tc.NameIdx])
 	// fmt.Printf("%s\n", constPoolItems[sc.NameIdx])
 
-	for i := 0; i < int(data2.MethodsCount); i++ {
-		fmt.Println("1階層:", i)
-		ReadAttribute(f, constPoolItems, int(data2.MethodsCount))
+	ReadMethod(f, constPoolItems)
+}
+
+type Method struct {
+	AccessFlags     uint16
+	NameIdx         uint16
+	DescriptorIdx   uint16
+	AttributesCount uint16
+}
+
+func ReadMethod(f *os.File, cpe []interface{}) {
+	var methods_count uint16
+	errb := binary.Read(f, binary.BigEndian, &methods_count)
+	if errb != nil {
+		panic(errb)
+	}
+	// attributes
+	for i := 0; i < int(methods_count); i++ {
+		var method Method
+		errb := binary.Read(f, binary.BigEndian, &method)
+		if errb != nil {
+			panic(errb)
+		}
+
+		for j := 0; j < int(method.AttributesCount-1); j++ {
+			ReadAttr(f, cpe)
+		}
 	}
 }
 
-func ReadAttribute(f *os.File, cpe []interface{}, methodsCount int) {
-	var attributeNameIndex uint16
-	errb := binary.Read(f, binary.BigEndian, &attributeNameIndex)
+func ReadAttr(f *os.File, cpe []interface{}) {
+	var attributeNameIdx uint16
+	errb := binary.Read(f, binary.BigEndian, &attributeNameIdx)
 	if errb != nil {
 		panic(errb)
 	}
 
-	var attributesLength uint8
-	errb = binary.Read(f, binary.BigEndian, &attributesLength)
+	var attributeLen uint32
+	errb = binary.Read(f, binary.BigEndian, &attributeLen)
 	if errb != nil {
 		panic(errb)
 	}
 
-	attridx := cpe[attributeNameIndex]
+	attridx := cpe[attributeNameIdx]
 	attridx_utf8, ok := attridx.(ConstUtf8)
+
 	if ok {
-		name := fmt.Sprintf("%s", attridx_utf8.bytes)
-		if name == "Code" {
-			fmt.Println("code")
-			var maxStack uint16
-			errb = binary.Read(f, binary.BigEndian, &maxStack)
-			if errb != nil {
-				panic(errb)
-			}
-
-			var maxLocals uint16
-			errb = binary.Read(f, binary.BigEndian, &maxLocals)
-			if errb != nil {
-				panic(errb)
-			}
-
-			var codeLength uint32
-			errb = binary.Read(f, binary.BigEndian, &codeLength)
-			if errb != nil {
-				panic(errb)
-			}
-			// var code uint
-		} else if name == "LineNumberTable" {
-			fmt.Println("linenumber")
+		switch fmt.Sprintf("%s", attridx_utf8.bytes) {
+		case "Code":
+			ReadCodeAttr(f, cpe, attributeLen)
+		case "LineNumberTable":
+			fmt.Println("linenum")
+		case "SourceFile":
+			fmt.Println("sourcefile")
+		default:
+			panic(fmt.Sprintf("%s is not implemented", attridx_utf8.bytes))
 		}
+	}
+}
 
-		return
+func ReadCodeAttr(f *os.File, cpe []interface{}, attrLen uint32) {
+	var maxStack uint16
+	errb := binary.Read(f, binary.BigEndian, &maxStack)
+	if errb != nil {
+		panic(errb)
 	}
 
-	var methods []interface{}
-	var attributeInfo []interface{}
-
-	for i := 0; i < methodsCount; i++ {
-		fmt.Println("関数1", i)
-		var method []interface{}
-
-		var accessFlag uint16
-		errb = binary.Read(f, binary.BigEndian, &accessFlag)
-		if errb != nil {
-			panic(errb)
-		}
-
-		var nameIdx uint16
-		errb = binary.Read(f, binary.BigEndian, &nameIdx)
-		if errb != nil {
-			panic(errb)
-		}
-		// nameIdxValue := cpe[nameIdx]
-
-		var descriptorIdx uint16
-		errb = binary.Read(f, binary.BigEndian, &descriptorIdx)
-		if errb != nil {
-			panic(errb)
-		}
-		// descriptorIdxValue := cpe[descriptorIdx]
-
-		var attributesCount uint32
-		errb = binary.Read(f, binary.BigEndian, &attributesCount)
-		if errb != nil {
-			panic(errb)
-		}
-
-		for j := 0; j < int(attributesCount); j++ {
-			fmt.Println("関数2", i)
-			ReadAttribute(f, cpe, methodsCount)
-			// attributeInfo = append(attributeInfo, ReadAttribute(f, cpe, methodsCount))
-		}
-		methods = append(methods, method)
+	var maxLocals uint16
+	errb = binary.Read(f, binary.BigEndian, &maxLocals)
+	if errb != nil {
+		panic(errb)
 	}
-	fmt.Println(attributeInfo)
+
+	var codeLen uint32
+	errb = binary.Read(f, binary.BigEndian, &codeLen)
+	if errb != nil {
+		panic(errb)
+	}
+	fmt.Printf("%o\n", codeLen)
+
+	// codeLenが大きな数値になる。それでバイナリサイズを超える
+	// len と countが違う
+
+	var code []uint8
+	for i := 0; i < int(codeLen); i++ {
+		var b uint8
+		errb = binary.Read(f, binary.BigEndian, &b)
+		if errb != nil {
+			panic(errb)
+		}
+		code = append(code, b)
+	}
+
+	var exceptionTableLen uint16
+	errb = binary.Read(f, binary.BigEndian, &exceptionTableLen)
+	if errb != nil {
+		panic(errb)
+	}
+
+	for i := 0; i < int(exceptionTableLen); i++ {
+		// skip
+	}
+
+	var attrCount uint16
+	errb = binary.Read(f, binary.BigEndian, &attrCount)
+	if errb != nil {
+		panic(errb)
+	}
+
+	for i := 0; i < int(attrCount); i++ {
+		ReadAttr(f, cpe) // attr =
+	}
 }
