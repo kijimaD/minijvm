@@ -67,10 +67,13 @@ func (cl *ClassFile) Run() {
 		panic(errb)
 	}
 
+	var attrs []interface{}
 	for i := 0; i < int(attrCount); i++ {
-		cl.ReadAttr()
+		attr := cl.ReadAttr()
+		attrs = append(attrs, attr)
 	}
 
+	cl.Attributes = attrs
 	cl.AttributesCount = attrCount
 }
 
@@ -160,8 +163,10 @@ func (cl *ClassFile) ReadMethods() {
 			panic(errb)
 		}
 
+		var attrs []interface{}
 		for i := 0; i < int(m.AttributesCount); i++ {
-			cl.ReadAttr()
+			attr := cl.ReadAttr()
+			attrs = append(attrs, attr)
 		}
 
 		mi := MethodInfo{
@@ -169,12 +174,13 @@ func (cl *ClassFile) ReadMethods() {
 			NameIdx:         m.NameIdx,
 			DescriptorIdx:   m.DescriptorIdx,
 			AttributesCount: m.AttributesCount,
+			Attributes:      attrs,
 		}
 		cl.Methods = append(cl.Methods, mi)
 	}
 }
 
-func (cl *ClassFile) ReadAttr() {
+func (cl *ClassFile) ReadAttr() interface{} {
 	var attributeNameIdx uint16
 	errb := binary.Read(cl.File, binary.BigEndian, &attributeNameIdx)
 	if errb != nil {
@@ -190,23 +196,27 @@ func (cl *ClassFile) ReadAttr() {
 	attridx := cl.ConstantPool[attributeNameIdx-1]
 	attridx_utf8, ok := attridx.(ConstUtf8)
 
+	var attr interface{}
+
 	if ok {
 		switch fmt.Sprintf("%s", attridx_utf8.Bytes) {
 		case "Code":
-			cl.ReadCodeAttr(attributeLen)
+			attr = cl.ReadCodeAttr(attributeNameIdx, attributeLen)
 		case "LineNumberTable":
-			cl.ReadLineNumTableAttr()
+			attr = cl.ReadLineNumTableAttr(attributeNameIdx)
 		case "SourceFile":
-			cl.ReadSourceFileAttr()
+			attr = cl.ReadSourceFileAttr(attributeNameIdx, attributeLen)
 		default:
 			panic(fmt.Sprintf("%s is not implemented", attridx_utf8.Bytes))
 		}
 	} else {
 		panic("attr is not ConstUtf8")
 	}
+
+	return attr
 }
 
-func (cl *ClassFile) ReadCodeAttr(attrLen uint32) {
+func (cl *ClassFile) ReadCodeAttr(attrNameIdx uint16, attrLen uint32) CodeAttr {
 	var maxStack uint16
 	errb := binary.Read(cl.File, binary.BigEndian, &maxStack)
 	if errb != nil {
@@ -254,31 +264,53 @@ func (cl *ClassFile) ReadCodeAttr(attrLen uint32) {
 	for i := 0; i < int(attrCount); i++ {
 		cl.ReadAttr() // attr =
 	}
+
+	return CodeAttr{
+		AttrNameIdx:          attrNameIdx,
+		AttrLength:           attrLen,
+		MaxStack:             maxStack,
+		MaxLocals:            maxLocals,
+		CodeLength:           codeLen,
+		Code:                 code,
+		ExceptionTableLength: exceptionTableLen,
+		AttrCount:            attrCount,
+	}
 }
 
-func (cl *ClassFile) ReadLineNumTableAttr() {
+func (cl *ClassFile) ReadLineNumTableAttr(attrNameIdx uint16) LineNumberTableAttr {
 	var lineNumberTableLength uint16
 	errb := binary.Read(cl.File, binary.BigEndian, &lineNumberTableLength)
 	if errb != nil {
 		panic(errb)
 	}
 
+	var lineNumberTables []LineNumberTable
 	for i := 0; i < int(lineNumberTableLength); i++ {
-		linumtable := struct {
-			StartPC uint16
-			LineNum uint16
-		}{}
+		var linumtable LineNumberTable
 		errb = binary.Read(cl.File, binary.BigEndian, &linumtable)
 		if errb != nil {
 			panic(errb)
 		}
+		lineNumberTables = append(lineNumberTables, linumtable)
+	}
+
+	return LineNumberTableAttr{
+		AttrNameIdx:     attrNameIdx,
+		AttrLength:      lineNumberTableLength,
+		LineNumberTable: lineNumberTables,
 	}
 }
 
-func (cl *ClassFile) ReadSourceFileAttr() {
+func (cl *ClassFile) ReadSourceFileAttr(attrNameIdx uint16, attrLen uint32) SourceFileAttr {
 	var sourcefileIdx uint16
 	errb := binary.Read(cl.File, binary.BigEndian, &sourcefileIdx)
 	if errb != nil {
 		panic(errb)
+	}
+
+	return SourceFileAttr{
+		AttrNameIdx:   attrNameIdx,
+		AttrLength:    attrLen,
+		SourceFileIdx: sourcefileIdx,
 	}
 }

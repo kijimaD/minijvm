@@ -19,7 +19,7 @@ type ClassFile struct {
 	MethodsCount    uint16
 	Methods         []MethodInfo
 	AttributesCount uint16
-	Attributes      []AttributeInfo // その他の付加情報
+	Attributes      []interface{} // その他の付加情報
 }
 
 type ConstUtf8 struct {
@@ -32,13 +32,7 @@ type MethodInfo struct {
 	NameIdx         uint16
 	DescriptorIdx   uint16
 	AttributesCount uint16
-	Attributes      []AttributeInfo
-}
-
-type AttributeInfo struct {
-	AttributeNameIdx uint16
-	AttributeLen     uint32
-	Info             []uint8
+	Attributes      []interface{}
 }
 
 type ConstClass struct {
@@ -62,4 +56,34 @@ type MethodRef struct {
 type NameAndType struct {
 	NameIdx       uint16
 	DescriptorIdx uint16
+}
+
+type CodeAttr struct {
+	AttrNameIdx          uint16
+	AttrLength           uint32
+	MaxStack             uint16
+	MaxLocals            uint16
+	CodeLength           uint32
+	Code                 []uint8
+	ExceptionTableLength uint16
+	// ExceptionTable []exceptionTable
+	AttrCount uint16
+	// AttrInfoAttributes []interface{}
+}
+
+type LineNumberTableAttr struct {
+	AttrNameIdx     uint16
+	AttrLength      uint16
+	LineNumberTable []LineNumberTable
+}
+
+type LineNumberTable struct {
+	StartPC    uint16
+	LineNumber uint16
+}
+
+type SourceFileAttr struct {
+	AttrNameIdx   uint16
+	AttrLength    uint32
+	SourceFileIdx uint16
 }
