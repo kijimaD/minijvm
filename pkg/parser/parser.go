@@ -17,15 +17,15 @@ type ClassFile struct {
 	ConstantPoolCount uint16        // constantPoolの長さに1足した数
 	ConstantPool      []interface{} // 定数プール。クラス名やメソッド名、文字列などを定義
 	// AccessFlags        uint     // クラスあるいはインターフェースの情報、アクセス制御に関するフラグ
-	ThisClass  uint16 // このクラスあるいはインターフェースが何なのか。constant_poolで定義されているはずのこのクラス情報のインデックスが入る
-	SuperClass uint16 // 親クラスを示すconstant_poolのインデックスが入る
-	// InterfacesCount    uint
+	ThisClass       uint16 // このクラスあるいはインターフェースが何なのか。constant_poolで定義されているはずのこのクラス情報のインデックスが入る
+	SuperClass      uint16 // 親クラスを示すconstant_poolのインデックスが入る
+	InterfacesCount uint16
 	// Interfaces         []uint // このクラスが実装しているインターフェース情報。定数プールに定義されているインターフェースのインデックスが入る
-	// FieldsCount        uint
+	FieldsCount uint16
 	// Fields             []FieldInfo // 各フィールドの定義情報
-	// MethodsCount       uint
+	MethodsCount uint16
 	// Methods            MethodInfo
-	// AttributesCount    uint
+	AttributesCount uint16
 	// Attributes         AttributeInfo // その他の付加情報
 }
 
@@ -152,8 +152,23 @@ func (cl *ClassFile) Run() {
 
 	cl.ThisClass = data2.ThisClass
 	cl.SuperClass = data2.SuperClass
+	cl.InterfacesCount = data2.InterfacesCount
+	cl.FieldsCount = data2.FieldsCount
+	cl.MethodsCount = data2.MethodsCount
 
-	ReadMethod(f, constPoolItems)
+	cl.ReadMethods(f, constPoolItems)
+
+	var attrCount uint16
+	errb = binary.Read(f, binary.BigEndian, &attrCount)
+	if errb != nil {
+		panic(errb)
+	}
+
+	for i := 0; i < int(attrCount); i++ {
+		// ReadAttr(f, constPoolItems)
+	}
+
+	cl.AttributesCount = attrCount
 }
 
 type Method struct {
@@ -163,24 +178,16 @@ type Method struct {
 	AttributesCount uint16
 }
 
-func ReadMethod(f *os.File, cpe []interface{}) {
-	var methods_count uint16
-	errb := binary.Read(f, binary.BigEndian, &methods_count)
-	if errb != nil {
-		panic(errb)
-	}
-
-	for i := 0; i < int(methods_count); i++ {
+func (cl *ClassFile) ReadMethods(f *os.File, cpe []interface{}) {
+	for i := 0; i < int(cl.MethodsCount); i++ {
 		var method Method
-		errb = binary.Read(f, binary.BigEndian, &method)
+		errb := binary.Read(f, binary.BigEndian, &method)
 		if errb != nil {
 			panic(errb)
 		}
 
 		for i := 0; i < int(method.AttributesCount); i++ {
-			for j := 0; j < int(method.AttributesCount-1); j++ {
-				ReadAttr(f, cpe)
-			}
+			ReadAttr(f, cpe)
 		}
 	}
 }
@@ -206,12 +213,14 @@ func ReadAttr(f *os.File, cpe []interface{}) {
 		case "Code":
 			ReadCodeAttr(f, cpe, attributeLen)
 		case "LineNumberTable":
-			fmt.Println("linenum")
+			ReadLineNumTableAttr(f, cpe)
 		case "SourceFile":
-			ReadSourceFile(f, cpe)
+			ReadSourceFileAttr(f, cpe)
 		default:
 			panic(fmt.Sprintf("%s is not implemented", attridx_utf8.Bytes))
 		}
+	} else {
+		panic("attr is not ConstUtf8")
 	}
 }
 
@@ -265,15 +274,28 @@ func ReadCodeAttr(f *os.File, cpe []interface{}, attrLen uint32) {
 	}
 }
 
-type SourceFile struct {
-	AttrNameIdx   uint16
-	AttrLen       uint32
-	SourceFileIdx uint16
+func ReadLineNumTableAttr(f *os.File, cpe []interface{}) {
+	var lineNumberTableLength uint16
+	errb := binary.Read(f, binary.BigEndian, &lineNumberTableLength)
+	if errb != nil {
+		panic(errb)
+	}
+
+	for i := 0; i < int(lineNumberTableLength); i++ {
+		linumtable := struct {
+			StartPC uint16
+			LineNum uint16
+		}{}
+		errb = binary.Read(f, binary.BigEndian, &linumtable)
+		if errb != nil {
+			panic(errb)
+		}
+	}
 }
 
-func ReadSourceFile(f *os.File, cpe interface{}) {
-	var sourcefile SourceFile
-	errb := binary.Read(f, binary.BigEndian, &sourcefile)
+func ReadSourceFileAttr(f *os.File, cpe []interface{}) {
+	var sourcefileIdx uint16
+	errb := binary.Read(f, binary.BigEndian, &sourcefileIdx)
 	if errb != nil {
 		panic(errb)
 	}

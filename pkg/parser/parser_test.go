@@ -30,4 +30,9 @@ func TestParser(t *testing.T) {
 		name := fmt.Sprintf("%s", utf8.Bytes)
 		assert.Equal("java/lang/System", name)
 	}
+
+	assert.Equal(0, int(cl.InterfacesCount))
+	assert.Equal(2, int(cl.MethodsCount))
+	assert.Equal(0, int(cl.FieldsCount))
+	assert.Equal(1, int(cl.AttributesCount))
 }
