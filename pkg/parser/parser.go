@@ -29,17 +29,6 @@ type ClassFile struct {
 	// Attributes         AttributeInfo // その他の付加情報
 }
 
-type Data2 struct {
-	AccessFlags     uint16
-	ThisClass       uint16
-	SuperClass      uint16
-	InterfacesCount uint16
-	// Interfaces      uint16 // skip
-	FieldsCount uint16
-	// Fields      FieldInfo // skip
-	MethodsCount uint16
-}
-
 func (cl *ClassFile) Run() {
 	f, err := os.Open("../Main.class")
 	if err != nil {
@@ -63,11 +52,51 @@ func (cl *ClassFile) Run() {
 	cl.MajorVersion = data.MajorVersion
 	cl.ConstantPoolCount = data.ConstantPoolCount
 
+	cl.ReadConstantPool(f)
+
+	data2 := struct {
+		AccessFlags     uint16
+		ThisClass       uint16
+		SuperClass      uint16
+		InterfacesCount uint16
+		// Interfaces      uint16 // skip
+		FieldsCount uint16
+		// Fields      FieldInfo // skip
+		MethodsCount uint16
+	}{}
+
+	errb = binary.Read(f, binary.BigEndian, &data2)
+	if errb != nil {
+		panic(errb)
+	}
+
+	cl.ThisClass = data2.ThisClass
+	cl.SuperClass = data2.SuperClass
+	cl.InterfacesCount = data2.InterfacesCount
+	cl.FieldsCount = data2.FieldsCount
+	cl.MethodsCount = data2.MethodsCount
+
+	cl.ReadMethods(f, cl.ConstantPool)
+
+	var attrCount uint16
+	errb = binary.Read(f, binary.BigEndian, &attrCount)
+	if errb != nil {
+		panic(errb)
+	}
+
+	for i := 0; i < int(attrCount); i++ {
+		ReadAttr(f, cl.ConstantPool)
+	}
+
+	cl.AttributesCount = attrCount
+}
+
+func (cl *ClassFile) ReadConstantPool(f *os.File) {
 	var constPoolItems []interface{}
 
-	for i := 0; i < int(data.ConstantPoolCount-1); i++ {
+	for i := 0; i < int(cl.ConstantPoolCount-1); i++ {
 		var tag uint8
-		errb = binary.Read(f, binary.BigEndian, &tag)
+		errb := binary.Read(f, binary.BigEndian, &tag)
 		if errb != nil {
 			panic(errb)
 		}
@@ -133,42 +162,6 @@ func (cl *ClassFile) Run() {
 	}
 
 	cl.ConstantPool = constPoolItems
-
-	data2 := struct {
-		AccessFlags     uint16
-		ThisClass       uint16
-		SuperClass      uint16
-		InterfacesCount uint16
-		// Interfaces      uint16 // skip
-		FieldsCount uint16
-		// Fields      FieldInfo // skip
-		MethodsCount uint16
-	}{}
-
-	errb = binary.Read(f, binary.BigEndian, &data2)
-	if errb != nil {
-		panic(errb)
-	}
-
-	cl.ThisClass = data2.ThisClass
-	cl.SuperClass = data2.SuperClass
-	cl.InterfacesCount = data2.InterfacesCount
-	cl.FieldsCount = data2.FieldsCount
-	cl.MethodsCount = data2.MethodsCount
-
-	cl.ReadMethods(f, constPoolItems)
-
-	var attrCount uint16
-	errb = binary.Read(f, binary.BigEndian, &attrCount)
-	if errb != nil {
-		panic(errb)
-	}
-
-	for i := 0; i < int(attrCount); i++ {
-		// ReadAttr(f, constPoolItems)
-	}
-
-	cl.AttributesCount = attrCount
 }
 
 type Method struct {
