@@ -32,7 +32,20 @@ func TestParser(t *testing.T) {
 	}
 
 	assert.Equal(0, int(cl.InterfacesCount))
+	assert.Equal(0, len(cl.Interfaces))
 	assert.Equal(2, int(cl.MethodsCount))
+	assert.Equal(2, len(cl.Methods))
+	{
+		utf8, _ := cl.ConstantPool[cl.Methods[0].NameIdx-1].(ConstUtf8)
+		name := fmt.Sprintf("%s", utf8.Bytes)
+		assert.Equal("<init>", name)
+	}
+	{
+		utf8, _ := cl.ConstantPool[cl.Methods[1].NameIdx-1].(ConstUtf8)
+		name := fmt.Sprintf("%s", utf8.Bytes)
+		assert.Equal("main", name)
+	}
+
 	assert.Equal(0, int(cl.FieldsCount))
 	assert.Equal(1, int(cl.AttributesCount))
 }

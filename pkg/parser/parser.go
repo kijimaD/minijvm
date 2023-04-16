@@ -10,26 +10,6 @@ import (
 // u2 -> uint16
 // u1 -> uint8
 
-type ClassFile struct {
-	File              *os.File
-	Magic             uint32 // マジックナンバー
-	MinorVersion      uint16
-	MajorVersion      uint16
-	ConstantPoolCount uint16        // constantPoolの長さに1足した数
-	ConstantPool      []interface{} // 定数プール。クラス名やメソッド名、文字列などを定義
-	// AccessFlags        uint     // クラスあるいはインターフェースの情報、アクセス制御に関するフラグ
-	ThisClass       uint16 // このクラスあるいはインターフェースが何なのか。constant_poolで定義されているはずのこのクラス情報のインデックスが入る
-	SuperClass      uint16 // 親クラスを示すconstant_poolのインデックスが入る
-	InterfacesCount uint16
-	// Interfaces         []uint // このクラスが実装しているインターフェース情報。定数プールに定義されているインターフェースのインデックスが入る
-	FieldsCount uint16
-	// Fields             []FieldInfo // 各フィールドの定義情報
-	MethodsCount uint16
-	// Methods            MethodInfo
-	AttributesCount uint16
-	// Attributes         AttributeInfo // その他の付加情報
-}
-
 func (cl *ClassFile) Run() {
 	f, err := os.Open("../Main.class")
 	if err != nil {
@@ -72,6 +52,7 @@ func (cl *ClassFile) Run() {
 		panic(errb)
 	}
 
+	cl.AccessFlags = data2.AccessFlags
 	cl.ThisClass = data2.ThisClass
 	cl.SuperClass = data2.SuperClass
 	cl.InterfacesCount = data2.InterfacesCount
@@ -182,6 +163,14 @@ func (cl *ClassFile) ReadMethods() {
 		for i := 0; i < int(m.AttributesCount); i++ {
 			cl.ReadAttr()
 		}
+
+		mi := MethodInfo{
+			AccessFlags:     m.AccessFlags,
+			NameIdx:         m.NameIdx,
+			DescriptorIdx:   m.DescriptorIdx,
+			AttributesCount: m.AttributesCount,
+		}
+		cl.Methods = append(cl.Methods, mi)
 	}
 }
 
