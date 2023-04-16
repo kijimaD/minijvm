@@ -11,14 +11,14 @@ import (
 // u1 -> uint8
 
 type ClassFile struct {
-	// Magic              uint // マジックナンバー
-	// MinorVersion       uint
-	// MajorVersion       uint
-	// ConstantPool_count uint     // constantPoolの長さに1足した数
-	// ConstantPool       []CpInfo // 定数プール。クラス名やメソッド名、文字列などを定義
+	Magic             uint32 // マジックナンバー
+	MinorVersion      uint16
+	MajorVersion      uint16
+	ConstantPoolCount uint16        // constantPoolの長さに1足した数
+	ConstantPool      []interface{} // 定数プール。クラス名やメソッド名、文字列などを定義
 	// AccessFlags        uint     // クラスあるいはインターフェースの情報、アクセス制御に関するフラグ
-	// ThisClass          uint     // このクラスあるいはインターフェースが何なのか。constant_poolで定義されているはずのこのクラス情報のインデックスが入る
-	// SuperClass         uint     // 親クラスを示すconstant_poolのインデックスが入る
+	ThisClass  uint16 // このクラスあるいはインターフェースが何なのか。constant_poolで定義されているはずのこのクラス情報のインデックスが入る
+	SuperClass uint16 // 親クラスを示すconstant_poolのインデックスが入る
 	// InterfacesCount    uint
 	// Interfaces         []uint // このクラスが実装しているインターフェース情報。定数プールに定義されているインターフェースのインデックスが入る
 	// FieldsCount        uint
@@ -29,11 +29,15 @@ type ClassFile struct {
 	// Attributes         AttributeInfo // その他の付加情報
 }
 
-type Data1 struct {
-	Magic             uint32
-	MinorVersion      uint16
-	MajorVersion      uint16
-	ConstantPoolCount uint16
+type Data2 struct {
+	AccessFlags     uint16
+	ThisClass       uint16
+	SuperClass      uint16
+	InterfacesCount uint16
+	// Interfaces      uint16 // skip
+	FieldsCount uint16
+	// Fields      FieldInfo // skip
+	MethodsCount uint16
 }
 
 func (cl *ClassFile) Run() {
@@ -42,15 +46,26 @@ func (cl *ClassFile) Run() {
 		panic(err)
 	}
 
-	data1 := Data1{}
-	errb := binary.Read(f, binary.BigEndian, &data1)
+	data := struct {
+		Magic             uint32
+		MinorVersion      uint16
+		MajorVersion      uint16
+		ConstantPoolCount uint16
+	}{}
+
+	errb := binary.Read(f, binary.BigEndian, &data)
 	if errb != nil {
 		panic(errb)
 	}
 
+	cl.Magic = data.Magic
+	cl.MinorVersion = data.MinorVersion
+	cl.MajorVersion = data.MajorVersion
+	cl.ConstantPoolCount = data.ConstantPoolCount
+
 	var constPoolItems []interface{}
 
-	for i := 0; i < int(data1.ConstantPoolCount-1); i++ {
+	for i := 0; i < int(data.ConstantPoolCount-1); i++ {
 		var tag uint8
 		errb = binary.Read(f, binary.BigEndian, &tag)
 		if errb != nil {
@@ -117,11 +132,26 @@ func (cl *ClassFile) Run() {
 		}
 	}
 
-	// check
-	// tc, _ := constPoolItems[data2.ThisClass-1].(ConstClass)
-	// sc, _ := constPoolItems[data2.SuperClass-1].(ConstClass)
-	// fmt.Printf("%s\n", constPoolItems[tc.NameIdx])
-	// fmt.Printf("%s\n", constPoolItems[sc.NameIdx])
+	cl.ConstantPool = constPoolItems
+
+	data2 := struct {
+		AccessFlags     uint16
+		ThisClass       uint16
+		SuperClass      uint16
+		InterfacesCount uint16
+		// Interfaces      uint16 // skip
+		FieldsCount uint16
+		// Fields      FieldInfo // skip
+		MethodsCount uint16
+	}{}
+
+	errb = binary.Read(f, binary.BigEndian, &data2)
+	if errb != nil {
+		panic(errb)
+	}
+
+	cl.ThisClass = data2.ThisClass
+	cl.SuperClass = data2.SuperClass
 
 	ReadMethod(f, constPoolItems)
 }
@@ -140,16 +170,17 @@ func ReadMethod(f *os.File, cpe []interface{}) {
 		panic(errb)
 	}
 
-	var method Method
-	errb = binary.Read(f, binary.BigEndian, &method)
-	if errb != nil {
-		panic(errb)
-	}
+	for i := 0; i < int(methods_count); i++ {
+		var method Method
+		errb = binary.Read(f, binary.BigEndian, &method)
+		if errb != nil {
+			panic(errb)
+		}
 
-	// attributes
-	for i := 0; i < int(method.AttributesCount); i++ {
-		for j := 0; j < int(method.AttributesCount-1); j++ {
-			ReadAttr(f, cpe)
+		for i := 0; i < int(method.AttributesCount); i++ {
+			for j := 0; j < int(method.AttributesCount-1); j++ {
+				ReadAttr(f, cpe)
+			}
 		}
 	}
 }
@@ -167,7 +198,7 @@ func ReadAttr(f *os.File, cpe []interface{}) {
 		panic(errb)
 	}
 
-	attridx := cpe[attributeNameIdx]
+	attridx := cpe[attributeNameIdx-1]
 	attridx_utf8, ok := attridx.(ConstUtf8)
 
 	if ok {
@@ -177,7 +208,7 @@ func ReadAttr(f *os.File, cpe []interface{}) {
 		case "LineNumberTable":
 			fmt.Println("linenum")
 		case "SourceFile":
-			fmt.Println("sourcefile")
+			ReadSourceFile(f, cpe)
 		default:
 			panic(fmt.Sprintf("%s is not implemented", attridx_utf8.Bytes))
 		}
@@ -231,5 +262,19 @@ func ReadCodeAttr(f *os.File, cpe []interface{}, attrLen uint32) {
 
 	for i := 0; i < int(attrCount); i++ {
 		ReadAttr(f, cpe) // attr =
+	}
+}
+
+type SourceFile struct {
+	AttrNameIdx   uint16
+	AttrLen       uint32
+	SourceFileIdx uint16
+}
+
+func ReadSourceFile(f *os.File, cpe interface{}) {
+	var sourcefile SourceFile
+	errb := binary.Read(f, binary.BigEndian, &sourcefile)
+	if errb != nil {
+		panic(errb)
 	}
 }
