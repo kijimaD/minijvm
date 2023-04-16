@@ -78,7 +78,7 @@ func (cl *ClassFile) Run() {
 	cl.FieldsCount = data2.FieldsCount
 	cl.MethodsCount = data2.MethodsCount
 
-	cl.ReadMethods(cl.ConstantPool)
+	cl.ReadMethods()
 
 	var attrCount uint16
 	errb = binary.Read(f, binary.BigEndian, &attrCount)
@@ -87,7 +87,7 @@ func (cl *ClassFile) Run() {
 	}
 
 	for i := 0; i < int(attrCount); i++ {
-		cl.ReadAttr(cl.ConstantPool)
+		cl.ReadAttr()
 	}
 
 	cl.AttributesCount = attrCount
@@ -166,7 +166,7 @@ func (cl *ClassFile) ReadConstantPool() {
 	cl.ConstantPool = constPoolItems
 }
 
-func (cl *ClassFile) ReadMethods(cpe []interface{}) {
+func (cl *ClassFile) ReadMethods() {
 	for i := 0; i < int(cl.MethodsCount); i++ {
 		m := struct {
 			AccessFlags     uint16
@@ -180,12 +180,12 @@ func (cl *ClassFile) ReadMethods(cpe []interface{}) {
 		}
 
 		for i := 0; i < int(m.AttributesCount); i++ {
-			cl.ReadAttr(cpe)
+			cl.ReadAttr()
 		}
 	}
 }
 
-func (cl *ClassFile) ReadAttr(cpe []interface{}) {
+func (cl *ClassFile) ReadAttr() {
 	var attributeNameIdx uint16
 	errb := binary.Read(cl.File, binary.BigEndian, &attributeNameIdx)
 	if errb != nil {
@@ -198,17 +198,17 @@ func (cl *ClassFile) ReadAttr(cpe []interface{}) {
 		panic(errb)
 	}
 
-	attridx := cpe[attributeNameIdx-1]
+	attridx := cl.ConstantPool[attributeNameIdx-1]
 	attridx_utf8, ok := attridx.(ConstUtf8)
 
 	if ok {
 		switch fmt.Sprintf("%s", attridx_utf8.Bytes) {
 		case "Code":
-			cl.ReadCodeAttr(cpe, attributeLen)
+			cl.ReadCodeAttr(attributeLen)
 		case "LineNumberTable":
-			cl.ReadLineNumTableAttr(cpe)
+			cl.ReadLineNumTableAttr()
 		case "SourceFile":
-			cl.ReadSourceFileAttr(cpe)
+			cl.ReadSourceFileAttr()
 		default:
 			panic(fmt.Sprintf("%s is not implemented", attridx_utf8.Bytes))
 		}
@@ -217,7 +217,7 @@ func (cl *ClassFile) ReadAttr(cpe []interface{}) {
 	}
 }
 
-func (cl *ClassFile) ReadCodeAttr(cpe []interface{}, attrLen uint32) {
+func (cl *ClassFile) ReadCodeAttr(attrLen uint32) {
 	var maxStack uint16
 	errb := binary.Read(cl.File, binary.BigEndian, &maxStack)
 	if errb != nil {
@@ -263,11 +263,11 @@ func (cl *ClassFile) ReadCodeAttr(cpe []interface{}, attrLen uint32) {
 	}
 
 	for i := 0; i < int(attrCount); i++ {
-		cl.ReadAttr(cpe) // attr =
+		cl.ReadAttr() // attr =
 	}
 }
 
-func (cl *ClassFile) ReadLineNumTableAttr(cpe []interface{}) {
+func (cl *ClassFile) ReadLineNumTableAttr() {
 	var lineNumberTableLength uint16
 	errb := binary.Read(cl.File, binary.BigEndian, &lineNumberTableLength)
 	if errb != nil {
@@ -286,7 +286,7 @@ func (cl *ClassFile) ReadLineNumTableAttr(cpe []interface{}) {
 	}
 }
 
-func (cl *ClassFile) ReadSourceFileAttr(cpe []interface{}) {
+func (cl *ClassFile) ReadSourceFileAttr() {
 	var sourcefileIdx uint16
 	errb := binary.Read(cl.File, binary.BigEndian, &sourcefileIdx)
 	if errb != nil {
