@@ -8,7 +8,7 @@ type ClassFile struct {
 	MinorVersion      uint16
 	MajorVersion      uint16
 	ConstantPoolCount uint16        // constantPoolの長さに1足した数
-	ConstantPool      []interface{} // 定数プール。クラス名やメソッド名、文字列などを定義
+	ConstantPool      []interface{} // 定数プール。クラス名やメソッド名、文字列などを定義。
 	AccessFlags       uint16        // クラスあるいはインターフェースの情報、アクセス制御に関するフラグ
 	ThisClass         uint16        // このクラスあるいはインターフェースが何なのか。constant_poolで定義されているはずのこのクラス情報のインデックスが入る
 	SuperClass        uint16        // 親クラスを示すconstant_poolのインデックスが入る
@@ -22,15 +22,19 @@ type ClassFile struct {
 	Attributes      []interface{} // その他の付加情報
 }
 
+///////////////////////////
+// Constant Pool structs //
+///////////////////////////
+
 type ConstUtf8 struct {
 	Length uint16
 	Bytes  []uint8
 }
 
 type MethodInfo struct {
-	AccessFlags     uint16
+	AccessFlags     uint16 // メソッドへのアクセス権
 	NameIdx         uint16
-	DescriptorIdx   uint16
+	DescriptorIdx   uint16 // 引数の銃砲
 	AttributesCount uint16
 	Attributes      []interface{}
 }
@@ -58,13 +62,17 @@ type NameAndType struct {
 	DescriptorIdx uint16
 }
 
+///////////////////////
+// Attribute structs //
+///////////////////////
+
 type CodeAttr struct {
 	AttrNameIdx          uint16
 	AttrLength           uint32
 	MaxStack             uint16
 	MaxLocals            uint16
 	CodeLength           uint32
-	Code                 []uint8
+	Code                 []uint8 // オペコードが格納されている
 	ExceptionTableLength uint16
 	// ExceptionTable []exceptionTable
 	AttrCount uint16
