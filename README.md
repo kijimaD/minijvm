@@ -1,5 +1,7 @@
 This is minimal JVM...
 
+reference: https://speakerdeck.com/memory1994/php-de-jvm-woshi-zhuang-site-hello-world-wochu-li-surumade
+
 ## compile sample java code
 
 ```shell
@@ -7,7 +9,7 @@ docker-compose run --rm java /bin/bash
 javac Main.java
 ```
 
-spec
+## goal
 
 ```
 javap -v Main.class
